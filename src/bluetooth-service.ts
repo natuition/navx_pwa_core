@@ -6,6 +6,10 @@ export class BluetoothService {
   private server: BluetoothRemoteGATTServer | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private onDataCallback: ((data: string) => void) | null = null;
+  // Ecriture BLE: file d'attente et état
+  private writeQueue: ArrayBuffer[] = [];
+  private isWriting = false;
+  private rxCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
   // UART Service UUID (Nordic UART Service)
   private static readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -31,6 +35,9 @@ export class BluetoothService {
 
       // Get TX characteristic for receiving data
       this.characteristic = await service.getCharacteristic(BluetoothService.UART_TX_CHAR_UUID);
+
+      // Get RX characteristic for sending data (write)
+      this.rxCharacteristic = await service.getCharacteristic(BluetoothService.UART_RX_CHAR_UUID);
 
       // Start notifications
       await this.characteristic.startNotifications();
@@ -62,6 +69,10 @@ export class BluetoothService {
     this.device = null;
     this.server = null;
     this.characteristic = null;
+    this.rxCharacteristic = null;
+    // reset queue/flags
+    this.writeQueue = [];
+    this.isWriting = false;
     console.log('Bluetooth device disconnected');
   }
 
@@ -73,21 +84,62 @@ export class BluetoothService {
       throw new Error('Bluetooth device not connected');
     }
 
+    // Ajouter au buffer d'envoi et démarrer le traitement si nécessaire
+    this.writeQueue.push(data);
+    if (!this.isWriting) {
+      // Lancer en tâche de fond, sans bloquer l'appelant
+      this.processWriteQueue().catch((err) => {
+        console.error('Bluetooth write queue error:', err);
+      });
+    }
+  }
+
+  /**
+   * Traite la file d'attente d'écritures de manière séquentielle pour éviter
+   * l'erreur "GATT operation already in progress".
+   */
+  private async processWriteQueue(): Promise<void> {
+    if (this.isWriting) return;
+    this.isWriting = true;
+
     try {
-      const service = await this.server.getPrimaryService(BluetoothService.UART_SERVICE_UUID);
-      const rxCharacteristic = await service.getCharacteristic(BluetoothService.UART_RX_CHAR_UUID);
-
-      // Send data in chunks (BLE has MTU limits, typically 20 bytes)
-      const chunkSize = 20;
-      const dataArray = new Uint8Array(data);
-
-      for (let i = 0; i < dataArray.length; i += chunkSize) {
-        const chunk = dataArray.slice(i, Math.min(i + chunkSize, dataArray.length));
-        await rxCharacteristic.writeValue(chunk);
+      // S'assurer d'avoir la caractéristique d'écriture
+      if (!this.rxCharacteristic) {
+        if (!this.server) throw new Error('No GATT server');
+        const service = await this.server.getPrimaryService(BluetoothService.UART_SERVICE_UUID);
+        this.rxCharacteristic = await service.getCharacteristic(BluetoothService.UART_RX_CHAR_UUID);
       }
-    } catch (error) {
-      console.error('Bluetooth write error:', error);
-      throw error;
+
+      // Défile les éléments jusqu'à ce que la queue soit vide
+      while (this.writeQueue.length > 0 && this.server?.connected) {
+        const buf = this.writeQueue.shift()!;
+        await this.writeDataChunked(this.rxCharacteristic!, buf);
+      }
+    } finally {
+      this.isWriting = false;
+      // Si des éléments ont été ajoutés entre-temps, relancer
+      if (this.writeQueue.length > 0 && this.server?.connected) {
+        // éviter stack overflow: planifier dans la micro-tâche suivante
+        setTimeout(() => this.processWriteQueue().catch(console.error), 0);
+      }
+    }
+  }
+
+  /**
+   * Ecrit en paquets (20 octets typiquement) avec un petit délai entre paquets
+   * pour éviter de surcharger le lien BLE.
+   */
+  private async writeDataChunked(characteristic: BluetoothRemoteGATTCharacteristic, data: ArrayBuffer): Promise<void> {
+    const chunkSize = 20;
+    const dataArray = new Uint8Array(data);
+
+    for (let i = 0; i < dataArray.length; i += chunkSize) {
+      const chunk = dataArray.slice(i, Math.min(i + chunkSize, dataArray.length));
+      await characteristic.writeValue(chunk);
+      // Petit délai (5ms) entre paquets si d'autres suivent
+      if (i + chunkSize < dataArray.length) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
     }
   }
 

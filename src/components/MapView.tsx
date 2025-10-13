@@ -102,7 +102,8 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [0, 0],
-      zoom: 2,
+      zoom: 22, // default to max zoom
+      maxZoom: 22,
     });
 
     // Add default navigation control in top-right
@@ -182,7 +183,8 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       }
 
       if (isFirstPosition) {
-        map.current.flyTo({ center: coords, zoom: 16, duration: 1000 });
+        const maxZ = typeof map.current.getMaxZoom === 'function' ? map.current.getMaxZoom() : 22;
+        map.current.flyTo({ center: coords, zoom: maxZ, duration: 1000 });
         setIsFirstPosition(false);
       } else if (followMode) {
         // center without changing zoom
