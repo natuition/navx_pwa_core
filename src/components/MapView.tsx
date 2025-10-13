@@ -102,7 +102,8 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [0, 0],
-      zoom: 2,
+      zoom: 22, // default to max zoom
+      maxZoom: 22,
     });
 
     // Add default navigation control in top-right
@@ -182,7 +183,8 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       }
 
       if (isFirstPosition) {
-        map.current.flyTo({ center: coords, zoom: 16, duration: 1000 });
+        const maxZ = typeof map.current.getMaxZoom === 'function' ? map.current.getMaxZoom() : 22;
+        map.current.flyTo({ center: coords, zoom: maxZ, duration: 1000 });
         setIsFirstPosition(false);
       } else if (followMode) {
         // center without changing zoom
@@ -202,15 +204,20 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Colors mapping:
-    // NO_FIX (0) and GPS_FIX (1) -> grey
-    // DGPS_FIX (2) -> orange
-    // RTK_FLOAT (4) -> blue
-    // RTK_FIXED (5) -> green
+    // Colors mapping selon NMEA GGA:
+    // NO_FIX (0) -> grey
+    // GPS (1) -> grey
+    // DGPS (2) -> orange
+    // PPS (3) -> purple
+    // RTK_FIXED (4) -> green
+    // RTK_FLOAT (5) -> blue
+    // DEAD_RECKONING (6) -> yellow
     let color = '#6c757d'; // grey default for NO_FIX / GPS
     if (fixType === FixType.RTK_FIXED) color = '#28a745'; // green
     else if (fixType === FixType.RTK_FLOAT) color = '#007bff'; // blue
-    else if (fixType === FixType.DGPS_FIX) color = '#ff8c00'; // orange for DGPS
+    else if (fixType === FixType.PPS) color = '#6f42c1'; // purple for PPS
+    else if (fixType === FixType.DGPS) color = '#ff8c00'; // orange for DGPS
+    else if (fixType === FixType.DEAD_RECKONING) color = '#ffc107'; // yellow for dead reckoning
 
     try {
       if (map.current.getLayer('gps-point')) {
@@ -240,10 +247,12 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       // meters per pixel at given latitude and zoom
       const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
 
-      let meters = 5.0; // default for GNSS 5m
+      let meters = 5.0; // default for GPS 5m
       if (fixType === FixType.RTK_FIXED) meters = 0.02; // 2 cm
       else if (fixType === FixType.RTK_FLOAT) meters = 0.5; // 50 cm
-      else if (fixType === FixType.DGPS_FIX) meters = 3.0; // 3 m
+      else if (fixType === FixType.PPS) meters = 1.0; // 1 m
+      else if (fixType === FixType.DGPS) meters = 1.0; // 1 m
+      else if (fixType === FixType.DEAD_RECKONING) meters = 10.0; // 10 m
 
       let pixels = meters / metersPerPixel;
       if (!isFinite(pixels) || pixels <= 0) pixels = 1;
@@ -289,19 +298,23 @@ export const MapView: React.FC<MapViewProps> = ({ position, fixType }) => {
       <div className="map-legend">
         <div className={`legend-item ${fixType === FixType.RTK_FIXED ? 'active' : ''}`}>
           <span className="legend-dot green"></span>
-          <span>RTK fix</span>
+          <span>RTK Fixed</span>
         </div>
         <div className={`legend-item ${fixType === FixType.RTK_FLOAT ? 'active' : ''}`}>
           <span className="legend-dot blue"></span>
-          <span>RTK float</span>
+          <span>RTK Float</span>
         </div>
-        <div className={`legend-item ${fixType === FixType.DGPS_FIX ? 'active' : ''}`}>
+        <div className={`legend-item ${fixType === FixType.DGPS ? 'active' : ''}`}>
           <span className="legend-dot orange"></span>
           <span>DGNSS</span>
         </div>
-        <div className={`legend-item ${(fixType === FixType.NO_FIX || fixType === FixType.GPS_FIX) ? 'active' : ''}`}>
+        <div className={`legend-item ${(fixType === FixType.NO_FIX || fixType === FixType.GPS) ? 'active' : ''}`}>
           <span className="legend-dot grey"></span>
           <span>GNSS</span>
+        </div>
+        <div className={`legend-item ${fixType === FixType.DEAD_RECKONING ? 'active' : ''}`}>
+          <span className="legend-dot yellow"></span>
+          <span>Dead Reckoning</span>
         </div>
       </div>
     </div>

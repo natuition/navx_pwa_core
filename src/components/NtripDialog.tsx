@@ -113,6 +113,41 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
               </button>
               {showAdvanced && (
                 <>
+                  <label htmlFor="mountpoint">Mountpoint</label>
+                  <input
+                    id="mountpoint"
+                    type="text"
+                    value={mountpoint}
+                    onChange={(e) => {
+                      setMountpoint(e.target.value);
+                      // Si l'utilisateur tape NEAR, activer automatiquement l'envoi GPS
+                      if (e.target.value.toUpperCase() === 'NEAR') {
+                        setSendGpsToServer(true);
+                      }
+                    }}
+                    placeholder="NEAR"
+                    required
+                  />
+                  <small>Utilisez "NEAR" pour la sélection automatique de la station la plus proche</small>
+
+                  <label htmlFor="username">Nom d'utilisateur</label>
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Optionnel"
+                  />
+
+                  <label htmlFor="password">Mot de passe</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Optionnel"
+                  />
+
                   <label htmlFor="ws-url">Proxy WebSocket alternatif (optionnel)</label>
                   <input
                     id="ws-url"
@@ -125,44 +160,6 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
                   <small>Laisser vide pour utiliser le proxy externe par défaut</small>
                 </>
               )}
-            </div>
-            <div className="form-group">
-              <label htmlFor="mountpoint">Mountpoint</label>
-              <input
-                id="mountpoint"
-                type="text"
-                value={mountpoint}
-                onChange={(e) => {
-                  setMountpoint(e.target.value);
-                  // Si l'utilisateur tape NEAR, activer automatiquement l'envoi GPS
-                  if (e.target.value.toUpperCase() === 'NEAR') {
-                    setSendGpsToServer(true);
-                  }
-                }}
-                placeholder="NEAR"
-                required
-              />
-              <small>Utilisez "NEAR" pour la sélection automatique de la station la plus proche</small>
-            </div>
-            <div className="form-group">
-              <label htmlFor="username">Nom d'utilisateur</label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Optionnel"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="password">Mot de passe</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Optionnel"
-              />
             </div>
             <div className="form-group">
               <div className="switch-group">
@@ -227,6 +224,24 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
               </button>
               {showAdvanced && (
                 <>
+                  <label htmlFor="auto-username">Nom d'utilisateur</label>
+                  <input
+                    id="auto-username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Optionnel"
+                  />
+
+                  <label htmlFor="auto-password">Mot de passe</label>
+                  <input
+                    id="auto-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Optionnel"
+                  />
+
                   <label htmlFor="auto-ws-url">Proxy WebSocket alternatif (optionnel)</label>
                   <input
                     id="auto-ws-url"
@@ -239,26 +254,6 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
                   <small>Laisser vide pour utiliser le proxy externe par défaut</small>
                 </>
               )}
-            </div>
-            <div className="form-group">
-              <label htmlFor="auto-username">Nom d'utilisateur</label>
-              <input
-                id="auto-username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Optionnel"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="auto-password">Mot de passe</label>
-              <input
-                id="auto-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Optionnel"
-              />
             </div>
             <div className="form-group">
               <label htmlFor="max-distance">Distance maximale (km)</label>
