@@ -35,12 +35,12 @@ class FollowControl implements mapboxgl.IControl {
     this.button.setAttribute('aria-pressed', 'false');
 
     // Use image icons from public folder for on/off states
-    const img = document.createElement('img');
+  const img = document.createElement('img');
     img.alt = '';
     img.width = 18;
     img.height = 18;
-    const base = (import.meta as any).env.BASE_URL || '/';
-    img.src = `${base}icons/target_red.png`;
+  const base = import.meta.env.BASE_URL || '/';
+  img.src = `${base}icons/target_red.png`;
     this.button.appendChild(img);
 
     this.button.addEventListener('click', this.toggle.bind(this));
@@ -60,8 +60,8 @@ class FollowControl implements mapboxgl.IControl {
     this.enabled = !this.enabled;
     if (this.button) {
       this.button.setAttribute('aria-pressed', String(this.enabled));
-      const imgEl = this.button.querySelector('img');
-      const base = (import.meta as any).env.BASE_URL || '/';
+  const imgEl = this.button.querySelector('img');
+  const base = import.meta.env.BASE_URL || '/';
       if (imgEl) imgEl.src = this.enabled ? `${base}icons/target_green.png` : `${base}icons/target_red.png`;
       this.button.classList.toggle('mapboxgl-ctrl-follow-active', this.enabled);
     }
@@ -72,8 +72,8 @@ class FollowControl implements mapboxgl.IControl {
     this.enabled = v;
     if (this.button) {
       this.button.setAttribute('aria-pressed', String(this.enabled));
-      const imgEl = this.button.querySelector('img');
-      const base = (import.meta as any).env.BASE_URL || '/';
+  const imgEl = this.button.querySelector('img');
+  const base = import.meta.env.BASE_URL || '/';
       if (imgEl) imgEl.src = this.enabled ? `${base}icons/target_green.png` : `${base}icons/target_red.png`;
       this.button.classList.toggle('mapboxgl-ctrl-follow-active', this.enabled);
     }
