@@ -1,15 +1,26 @@
+import { Capacitor } from '@capacitor/core';
+import { BleClient } from '@capacitor-community/bluetooth-le';
+
 /**
- * Web Bluetooth service for connecting to GNSS devices
+ * Bluetooth service supporting Capacitor native BLE (iOS/Android) with Web Bluetooth fallback for PWA/Desktop.
  */
 export class BluetoothService {
+  // Web Bluetooth handles
   private device: BluetoothDevice | null = null;
   private server: BluetoothRemoteGATTServer | null = null;
-  private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private characteristic: BluetoothRemoteGATTCharacteristic | null = null; // TX notify
+  private rxCharacteristic: BluetoothRemoteGATTCharacteristic | null = null; // RX write
+
+  // Capacitor BLE handles
+  private useNative = Capacitor.isNativePlatform();
+  private nativeDeviceId: string | null = null;
+  private nativeDeviceName: string | null = null;
+  private nativeConnected = false;
+
+  // Common state
   private onDataCallback: ((data: string) => void) | null = null;
-  // Ecriture BLE: file d'attente et état
   private writeQueue: ArrayBuffer[] = [];
   private isWriting = false;
-  private rxCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
   // UART Service UUID (Nordic UART Service)
   private static readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -20,35 +31,66 @@ export class BluetoothService {
    * Request and connect to a Bluetooth device
    */
   async connect(): Promise<void> {
+    if (this.useNative) {
+      await this.connectNative();
+    } else {
+      await this.connectWeb();
+    }
+  }
+
+  private async connectNative(): Promise<void> {
     try {
-      // Request device
+      await BleClient.initialize();
+      const device = await BleClient.requestDevice({
+        services: [BluetoothService.UART_SERVICE_UUID],
+      });
+      this.nativeDeviceId = device.deviceId;
+      this.nativeDeviceName = (device as any).name ?? null;
+
+      await BleClient.connect(this.nativeDeviceId, () => {
+        this.nativeConnected = false;
+        this.nativeDeviceId = null;
+        this.nativeDeviceName = null;
+        console.log('Native BLE disconnected');
+      });
+      this.nativeConnected = true;
+
+      await BleClient.startNotifications(
+        this.nativeDeviceId,
+        BluetoothService.UART_SERVICE_UUID,
+        BluetoothService.UART_TX_CHAR_UUID,
+        (value) => this.handleNativeNotification(value)
+      );
+
+      console.log('Native BLE connected');
+    } catch (error) {
+      console.error('Native BLE connection error:', error);
+      throw error;
+    }
+  }
+
+  private async connectWeb(): Promise<void> {
+    try {
+      if (!("bluetooth" in navigator)) {
+        throw new Error('Web Bluetooth non supporté dans ce navigateur. Utilisez l\'application native (Capacitor) sur iOS.');
+      }
       this.device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [BluetoothService.UART_SERVICE_UUID] }],
         optionalServices: [BluetoothService.UART_SERVICE_UUID],
       });
 
-      // Connect to GATT server
       this.server = await this.device.gatt!.connect();
-
-      // Get UART service
       const service = await this.server.getPrimaryService(BluetoothService.UART_SERVICE_UUID);
-
-      // Get TX characteristic for receiving data
       this.characteristic = await service.getCharacteristic(BluetoothService.UART_TX_CHAR_UUID);
-
-      // Get RX characteristic for sending data (write)
       this.rxCharacteristic = await service.getCharacteristic(BluetoothService.UART_RX_CHAR_UUID);
 
-      // Start notifications
       await this.characteristic.startNotifications();
-      this.characteristic.addEventListener('characteristicvaluechanged', this.handleDataReceived.bind(this));
+      this.characteristic.addEventListener('characteristicvaluechanged', this.handleWebNotification);
 
-      // Handle disconnection
-      this.device.addEventListener('gattserverdisconnected', this.handleDisconnect.bind(this));
-
-      console.log('Bluetooth device connected');
+      this.device.addEventListener('gattserverdisconnected', this.handleWebDisconnect);
+      console.log('Web Bluetooth device connected');
     } catch (error) {
-      console.error('Bluetooth connection error:', error);
+      console.error('Web Bluetooth connection error:', error);
       throw error;
     }
   }
@@ -57,37 +99,70 @@ export class BluetoothService {
    * Disconnect from the Bluetooth device
    */
   async disconnect(): Promise<void> {
-    if (this.characteristic) {
-      await this.characteristic.stopNotifications();
-      this.characteristic.removeEventListener('characteristicvaluechanged', this.handleDataReceived.bind(this));
+    if (this.useNative) {
+      await this.disconnectNative();
+    } else {
+      await this.disconnectWeb();
     }
+    // reset queue/flags
+    this.writeQueue = [];
+    this.isWriting = false;
+  }
 
-    if (this.server && this.server.connected) {
+  private async disconnectNative(): Promise<void> {
+    try {
+      if (this.nativeDeviceId) {
+        try {
+          await BleClient.stopNotifications(
+            this.nativeDeviceId,
+            BluetoothService.UART_SERVICE_UUID,
+            BluetoothService.UART_TX_CHAR_UUID
+          );
+        } catch { }
+        await BleClient.disconnect(this.nativeDeviceId);
+      }
+    } finally {
+      this.nativeConnected = false;
+      this.nativeDeviceId = null;
+      this.nativeDeviceName = null;
+      console.log('Native BLE disconnected');
+    }
+  }
+
+  private async disconnectWeb(): Promise<void> {
+    if (this.characteristic) {
+      try {
+        await this.characteristic.stopNotifications();
+      } catch { }
+      this.characteristic.removeEventListener('characteristicvaluechanged', this.handleWebNotification);
+    }
+    if (this.server?.connected) {
       this.server.disconnect();
     }
-
     this.device = null;
     this.server = null;
     this.characteristic = null;
     this.rxCharacteristic = null;
-    // reset queue/flags
-    this.writeQueue = [];
-    this.isWriting = false;
-    console.log('Bluetooth device disconnected');
+    console.log('Web Bluetooth device disconnected');
   }
 
   /**
    * Write data to the Bluetooth device (for RTCM corrections)
    */
   async write(data: ArrayBuffer): Promise<void> {
-    if (!this.server || !this.server.connected) {
-      throw new Error('Bluetooth device not connected');
+    if (this.useNative) {
+      if (!this.nativeConnected || !this.nativeDeviceId) {
+        throw new Error('Bluetooth device not connected');
+      }
+    } else {
+      if (!this.server || !this.server.connected) {
+        throw new Error('Bluetooth device not connected');
+      }
     }
 
     // Ajouter au buffer d'envoi et démarrer le traitement si nécessaire
     this.writeQueue.push(data);
     if (!this.isWriting) {
-      // Lancer en tâche de fond, sans bloquer l'appelant
       this.processWriteQueue().catch((err) => {
         console.error('Bluetooth write queue error:', err);
       });
@@ -103,23 +178,13 @@ export class BluetoothService {
     this.isWriting = true;
 
     try {
-      // S'assurer d'avoir la caractéristique d'écriture
-      if (!this.rxCharacteristic) {
-        if (!this.server) throw new Error('No GATT server');
-        const service = await this.server.getPrimaryService(BluetoothService.UART_SERVICE_UUID);
-        this.rxCharacteristic = await service.getCharacteristic(BluetoothService.UART_RX_CHAR_UUID);
-      }
-
-      // Défile les éléments jusqu'à ce que la queue soit vide
-      while (this.writeQueue.length > 0 && this.server?.connected) {
+      while (this.writeQueue.length > 0 && (this.useNative ? this.nativeConnected : this.server?.connected)) {
         const buf = this.writeQueue.shift()!;
-        await this.writeDataChunked(this.rxCharacteristic!, buf);
+        await this.writeDataChunked(buf);
       }
     } finally {
       this.isWriting = false;
-      // Si des éléments ont été ajoutés entre-temps, relancer
-      if (this.writeQueue.length > 0 && this.server?.connected) {
-        // éviter stack overflow: planifier dans la micro-tâche suivante
+      if (this.writeQueue.length > 0 && (this.useNative ? this.nativeConnected : this.server?.connected)) {
         setTimeout(() => this.processWriteQueue().catch(console.error), 0);
       }
     }
@@ -129,16 +194,84 @@ export class BluetoothService {
    * Ecrit en paquets (20 octets typiquement) avec un petit délai entre paquets
    * pour éviter de surcharger le lien BLE.
    */
-  private async writeDataChunked(characteristic: BluetoothRemoteGATTCharacteristic, data: ArrayBuffer): Promise<void> {
+  private async writeDataChunked(data: ArrayBuffer): Promise<void> {
     const chunkSize = 20;
     const dataArray = new Uint8Array(data);
+    const interChunkDelayMs = this.useNative ? 5 : 8; // iOS rapide (5ms), Web légèrement ralenti (8ms)
 
     for (let i = 0; i < dataArray.length; i += chunkSize) {
       const chunk = dataArray.slice(i, Math.min(i + chunkSize, dataArray.length));
-      await characteristic.writeValue(chunk);
-      // Petit délai (5ms) entre paquets si d'autres suivent
-      if (i + chunkSize < dataArray.length) {
-        await new Promise((resolve) => setTimeout(resolve, 5));
+      if (this.useNative) {
+        const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+        await this.writeNativeWithRetry(view);
+      } else {
+        if (!this.rxCharacteristic) throw new Error('No RX characteristic');
+        await this.writeWebWithRetry(chunk);
+      }
+      if (i + chunkSize < dataArray.length) await this.sleep(interChunkDelayMs);
+    }
+  }
+
+  private async writeNativeWithRetry(view: DataView, maxRetries = 5): Promise<void> {
+    const anyBle = BleClient as unknown as Record<string, any>;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (typeof anyBle.writeWithoutResponse === 'function') {
+          await anyBle.writeWithoutResponse(
+            this.nativeDeviceId!,
+            BluetoothService.UART_SERVICE_UUID,
+            BluetoothService.UART_RX_CHAR_UUID,
+            view
+          );
+        } else {
+          await BleClient.write(
+            this.nativeDeviceId!,
+            BluetoothService.UART_SERVICE_UUID,
+            BluetoothService.UART_RX_CHAR_UUID,
+            view
+          );
+        }
+        return; // success
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (attempt < maxRetries && /GATT operation already in progress/i.test(msg)) {
+          // Petit backoff exponentiel: 12ms, 20ms, 35ms, 60ms, 80ms...
+          const delay = 12 + Math.floor(8 * Math.pow(1.6, attempt));
+          await this.sleep(delay);
+          continue;
+        }
+        // Dernier essai ou autre erreur: rethrow
+        throw e;
+      }
+    }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async writeWebWithRetry(data: Uint8Array, maxRetries = 5): Promise<void> {
+    const char: any = this.rxCharacteristic as unknown as Record<string, any>;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (typeof char.writeValueWithoutResponse === 'function') {
+          await char.writeValueWithoutResponse(data);
+        } else if (typeof char.writeValueWithResponse === 'function') {
+          await char.writeValueWithResponse(data);
+        } else if (typeof char.writeValue === 'function') {
+          await char.writeValue(data);
+        } else {
+          throw new Error('No supported write method on characteristic');
+        }
+        return; // success
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (attempt < maxRetries && /GATT operation already in progress/i.test(msg)) {
+          const delay = 10 + Math.floor(8 * Math.pow(1.6, attempt));
+          await this.sleep(delay);
+          continue;
+        }
+        throw e;
       }
     }
   }
@@ -151,43 +284,47 @@ export class BluetoothService {
   }
 
   /**
-   * Handle incoming data from device
+   * Handle incoming data from device - Web
    */
-  private handleDataReceived(event: Event): void {
+  private handleWebNotification = (event: Event): void => {
     const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
     const value = characteristic.value;
-
     if (value) {
       const decoder = new TextDecoder('utf-8');
       const text = decoder.decode(value);
-
-      if (this.onDataCallback) {
-        this.onDataCallback(text);
-      }
+      this.onDataCallback?.(text);
     }
-  }
+  };
 
-  /**
-   * Handle device disconnection
-   */
-  private handleDisconnect(): void {
-    console.log('Bluetooth device disconnected');
+  private handleWebDisconnect = (): void => {
+    console.log('Web Bluetooth device disconnected');
     this.device = null;
     this.server = null;
     this.characteristic = null;
+  };
+
+  /**
+   * Handle incoming data from device - Native
+   */
+  private handleNativeNotification(value: DataView): void {
+    // decode as UTF-8 text
+    const buffer = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+    const decoder = new TextDecoder('utf-8');
+    const text = decoder.decode(new Uint8Array(buffer));
+    this.onDataCallback?.(text);
   }
 
   /**
    * Check if device is connected
    */
   isConnected(): boolean {
-    return this.server?.connected ?? false;
+    return this.useNative ? this.nativeConnected : (this.server?.connected ?? false);
   }
 
   /**
    * Get device name
    */
   getDeviceName(): string | null {
-    return this.device?.name ?? null;
+    return this.useNative ? this.nativeDeviceName : (this.device?.name ?? null);
   }
 }

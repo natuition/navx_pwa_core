@@ -130,8 +130,7 @@ Note: Safari and Firefox do not currently support Web Bluetooth.
 The app uses WebSocket connections to communicate with NTRIP casters. Some NTRIP casters may require a WebSocket-to-TCP proxy service. For production use, you may need to set up your own proxy server.
 
 Popular free NTRIP casters:
-- RTK2GO (rtk2go.com:2101)
-- SNIP (various providers)
+- CENTIPEDE-RTK (crtk.com:2101)
 
 ## Modules
 

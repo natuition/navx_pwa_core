@@ -6,7 +6,7 @@
   width: 100vw;
   width: 100dvw;  /* mobile-safe */
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom/2);
 }
 
 .header {
@@ -17,7 +17,7 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding-top: calc(15px + env(safe-area-inset-top));
+  /* Header itself doesn't need to add safe-area; parent already accounts for it */
 }
 
 .header h1 {
