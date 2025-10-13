@@ -72,12 +72,9 @@ export class MountpointService {
     static async getMountpoints(config: AutoMountpointConfig): Promise<MountpointInfo[]> {
         return new Promise((resolve, reject) => {
             try {
-                // Créer une connexion WebSocket pour récupérer la sourcetable
-                // Note: En production, vous aurez besoin d'un proxy WebSocket-to-TCP
-                const wsUrl = `wss://${config.host}:${config.port}`;
-                const socket = new WebSocket(wsUrl);
-
-                socket.onopen = () => {
+                // Utiliser le proxy WebSocket externe pour récupérer la sourcetable
+                const wsUrl = `wss://ws-tcp-ntrip-client.natuition.com/?host=${encodeURIComponent(config.host)}&port=${encodeURIComponent(config.port.toString())}`;
+                const socket = new WebSocket(wsUrl); socket.onopen = () => {
                     // Envoyer la requête pour la sourcetable
                     const auth = btoa(`${config.username}:${config.password}`);
                     const request = [
