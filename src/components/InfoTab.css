@@ -42,9 +42,13 @@
   color: #333;
 }
 
-.info-value.fix-0,
+.info-value.fix-0 {
+  /* NO_FIX -> grey */
+  color: #6c757d;
+}
+
 .info-value.fix-1 {
-  /* NO_FIX and GPS_FIX -> grey */
+  /* GPS -> light grey */
   color: #6c757d;
 }
 
@@ -53,14 +57,24 @@
   color: #ff8c00;
 }
 
+.info-value.fix-3 {
+  /* PPS -> purple */
+  color: #6f42c1;
+}
+
 .info-value.fix-4 {
-  /* RTK float -> blue */
-  color: #007bff;
+  /* RTK Fixed -> green */
+  color: #28a745;
 }
 
 .info-value.fix-5 {
-  /* RTK fixed -> green */
-  color: #28a745;
+  /* RTK Float -> blue */
+  color: #007bff;
+}
+
+.info-value.fix-6 {
+  /* Dead Reckoning -> yellow */
+  color: #ffc107;
 }
 
 .sky-view {

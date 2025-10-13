@@ -228,7 +228,10 @@ function App() {
           </button>
           <button
             onClick={ntripConnected ? handleNtripDisconnect : () => setShowNtripDialog(true)}
-            style={{ backgroundColor: ntripConnected ? '#dc3545' : '#007bff' }}
+            style={{
+              backgroundColor: !bleConnected ? '#ccc' : (ntripConnected ? '#dc3545' : '#007bff'),
+              cursor: !bleConnected ? 'not-allowed' : 'pointer'
+            }}
             disabled={!bleConnected}
           >
             {ntripConnected ? 'Disconnect NTRIP' : 'Connect NTRIP'}
