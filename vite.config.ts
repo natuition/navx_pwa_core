@@ -7,6 +7,13 @@ export default defineConfig({
   base: process.env.GH_PAGES_BASE || '/',
   plugins: [
     react(),
+    {
+      name: 'html-base-url-inject',
+      transformIndexHtml(html) {
+        const base = process.env.GH_PAGES_BASE || '/';
+        return html.replaceAll('%BASE_URL%', base);
+      }
+    },
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
