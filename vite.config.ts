@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: (import.meta as any).env?.GH_PAGES_BASE || '/',
+  base: process.env.GH_PAGES_BASE || '/',
   plugins: [
     react(),
     VitePWA({
