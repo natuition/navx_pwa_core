@@ -81,13 +81,6 @@ function App() {
 
   // Handle Bluetooth connection
   const handleBleConnect = async () => {
-    // Defensive check: ensure Web Bluetooth API exists before attempting to connect
-    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
-      console.error('Web Bluetooth API not available in this browser/context');
-      alert('Web Bluetooth non disponible dans ce navigateur ou contexte. Utilisez Chrome sur Android et accédez à l\'application via HTTPS (ou utilisez ngrok)');
-      return;
-    }
-
     try {
       await bluetoothService.connect();
       setBleConnected(true);
@@ -97,7 +90,9 @@ function App() {
       });
     } catch (error) {
       console.error('Bluetooth connection failed:', error);
-      alert('Failed to connect to Bluetooth device. Make sure the device is paired and in range.');
+      const msg =
+        error instanceof Error ? error.message : 'Failed to connect to Bluetooth device. Make sure the device is paired and in range.';
+      alert(msg);
     }
   };
 
@@ -218,7 +213,7 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>NavX PWA</h1>
+        <h1>NavX</h1>
         <div className="header-buttons">
           <button
             onClick={bleConnected ? handleBleDisconnect : handleBleConnect}
