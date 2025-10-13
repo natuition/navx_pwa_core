@@ -24,13 +24,11 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
   const [wsUrlTouched, setWsUrlTouched] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Suggest a default proxy URL (local) based on host/port when user hasn't edited wsUrl
+  // Le proxy externe est maintenant utilisé par défaut - plus besoin de configuration WebSocket URL
   React.useEffect(() => {
     if (!wsUrlTouched) {
-      // prefer ws for localhost proxy; if page is served over https, wss would be required for remote proxy
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const suggested = `${proto}://localhost:8080/?host=${encodeURIComponent(host)}&port=${encodeURIComponent(String(port))}`;
-      setWsUrl(suggested);
+      // Laisser vide par défaut car on utilise maintenant le proxy externe automatiquement
+      setWsUrl('');
     }
   }, [host, port, wsUrlTouched]);
   const [mountpoint, setMountpoint] = useState('NEAR');
@@ -43,7 +41,7 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onConnect({ host, port, mountpoint, username, password, sendGpsToServer, wsUrl: wsUrl || undefined });
+    onConnect({ host, port, mountpoint, username, password, sendGpsToServer });
   };
 
   const handleAutoSubmit = (e: React.FormEvent) => {
@@ -52,7 +50,7 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
       alert('Position GPS requise pour la connexion automatique');
       return;
     }
-    onAutoConnect({ host, port, username, password, maxDistance, sendGpsToServer, wsUrl: wsUrl || undefined });
+    onAutoConnect({ host, port, username, password, maxDistance, sendGpsToServer });
   };
 
   return (
@@ -85,7 +83,7 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
         {connectionMode === 'manual' ? (
           <form onSubmit={handleManualSubmit}>
             <div className="near-info">
-              <p><strong>💡 Astuce :</strong> Utilisez le mountpoint "NEAR" pour que le caster sélectionne automatiquement la station de référence la plus proche de votre position.</p>
+              <p><strong>💡 Connexion directe :</strong> L'application se connecte automatiquement via le proxy externe. Utilisez le mountpoint "NEAR" pour sélectionner la station la plus proche.</p>
             </div>
             <div className="form-group">
               <label htmlFor="host">Hôte du Caster NTRIP</label>
@@ -115,16 +113,16 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
               </button>
               {showAdvanced && (
                 <>
-                  <label htmlFor="ws-url">WebSocket URL (optionnel)</label>
+                  <label htmlFor="ws-url">Proxy WebSocket alternatif (optionnel)</label>
                   <input
                     id="ws-url"
                     type="text"
                     value={wsUrl}
                     onChange={(e) => { setWsUrl(e.target.value); setWsUrlTouched(true); }}
                     onFocus={() => setWsUrlTouched(true)}
-                    placeholder="ws://localhost:8080/?host=crtk.net&port=2101"
+                    placeholder="Par défaut: wss://ws-tcp-ntrip-client.natuition.com"
                   />
-                  <small>Si vous utilisez un proxy WebSocket→TCP, spécifiez ici l'URL complète (ws://...)</small>
+                  <small>Laisser vide pour utiliser le proxy externe par défaut</small>
                 </>
               )}
             </div>
@@ -229,16 +227,16 @@ export const NtripDialog: React.FC<NtripDialogProps> = ({
               </button>
               {showAdvanced && (
                 <>
-                  <label htmlFor="auto-ws-url">WebSocket URL (optionnel)</label>
+                  <label htmlFor="auto-ws-url">Proxy WebSocket alternatif (optionnel)</label>
                   <input
                     id="auto-ws-url"
                     type="text"
                     value={wsUrl}
                     onChange={(e) => { setWsUrl(e.target.value); setWsUrlTouched(true); }}
                     onFocus={() => setWsUrlTouched(true)}
-                    placeholder="ws://localhost:8080/?host=crtk.net&port=2101"
+                    placeholder="Par défaut: wss://ws-tcp-ntrip-client.natuition.com"
                   />
-                  <small>Si vous utilisez un proxy WebSocket→TCP, spécifiez ici l'URL complète (ws://...)</small>
+                  <small>Laisser vide pour utiliser le proxy externe par défaut</small>
                 </>
               )}
             </div>

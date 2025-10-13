@@ -39,14 +39,10 @@ export class NtripClient {
     }
 
     try {
-      // Create WebSocket connection.
-      // If a full WebSocket URL is provided in config.wsUrl use it (useful when using a WebSocket->TCP proxy).
-      // Otherwise attempt to build a wss:// URL from host:port (may fail if caster isn't reachable via WebSocket).
-      const wsUrl = this.config.wsUrl && this.config.wsUrl.length > 0
-        ? this.config.wsUrl
-        : `wss://${this.config.host}:${this.config.port}`;
+      // Utiliser directement le proxy WebSocket externe
+      const wsUrl = `wss://ws-tcp-ntrip-client.natuition.com/?host=${encodeURIComponent(this.config.host)}&port=${encodeURIComponent(this.config.port.toString())}`;
 
-      console.log('Connecting to NTRIP via WebSocket URL:', wsUrl);
+      console.log('Connecting to NTRIP via external WebSocket proxy:', wsUrl);
 
       this.socket = new WebSocket(wsUrl);
       this.socket.binaryType = 'arraybuffer';
