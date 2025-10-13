@@ -126,7 +126,7 @@
 .map-legend {
   position: absolute;
   left: 12px;
-  bottom: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
   z-index: 1000;
   background: rgba(255,255,255,0.9);
   border-radius: 6px;

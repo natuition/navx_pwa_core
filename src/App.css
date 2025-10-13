@@ -2,7 +2,11 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* mobile-safe */
   width: 100vw;
+  width: 100dvw;  /* mobile-safe */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .header {
@@ -13,6 +17,7 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding-top: calc(15px + env(safe-area-inset-top));
 }
 
 .header h1 {
@@ -75,6 +80,7 @@
 .status-bar {
   background-color: #f8f9fa;
   padding: 8px 15px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid #ddd;
   font-size: 12px;
   display: flex;
