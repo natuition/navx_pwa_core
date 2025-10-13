@@ -42,21 +42,25 @@
   color: #333;
 }
 
-.info-value.fix-0 {
-  color: #dc3545;
-}
-
+.info-value.fix-0,
 .info-value.fix-1 {
-  color: #ffc107;
+  /* NO_FIX and GPS_FIX -> grey */
+  color: #6c757d;
 }
 
 .info-value.fix-2 {
-  color: #28a745;
+  /* DGPS -> orange */
+  color: #ff8c00;
 }
 
-.info-value.fix-4,
-.info-value.fix-5 {
+.info-value.fix-4 {
+  /* RTK float -> blue */
   color: #007bff;
+}
+
+.info-value.fix-5 {
+  /* RTK fixed -> green */
+  color: #28a745;
 }
 
 .sky-view {

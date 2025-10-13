@@ -137,6 +137,26 @@ netlify deploy --prod --dir=dist
 - ✅ Confirm credentials if required
 - ✅ Some casters may need WebSocket proxy
 
+#### Using the included WebSocket->TCP proxy (dev only)
+
+Browsers cannot open raw TCP sockets. Many NTRIP casters speak plain TCP on port 2101. To test connecting from the browser, you can run the included lightweight WebSocket->TCP proxy locally.
+
+1. Start the proxy from the project root:
+
+```bash
+# install dependencies if needed
+npm install ws
+node ntrip-ws-proxy.js --listenPort 8080
+```
+
+2. In the app, set the NTRIP "WebSocket URL" (advanced) to:
+
+```
+ws://localhost:8080/?host=crtk.net&port=2101
+```
+
+The proxy will forward WebSocket frames to the TCP host:port you provide in the query string. This proxy is intended for local development only.
+
 ## Project Structure
 
 ```

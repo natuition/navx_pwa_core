@@ -6,7 +6,8 @@ import { NtripDialog } from './components/NtripDialog';
 import { BluetoothService } from './bluetooth-service';
 import { NtripClient } from './ntrip-client';
 import { NmeaParser } from './nmea-parser';
-import { GpsPosition, NtripConfig, FixType, SatelliteInfo } from './types';
+import { MountpointService } from './mountpoint-service';
+import { GpsPosition, NtripConfig, AutoMountpointConfig, FixType, SatelliteInfo } from './types';
 
 type TabType = 'map' | 'info';
 
@@ -20,7 +21,7 @@ function App() {
   const [satellites, setSatellites] = useState<SatelliteInfo[]>([]);
   const [hdop, setHdop] = useState<number | undefined>();
   const [numSatellites, setNumSatellites] = useState<number | undefined>();
-  
+
   const [bluetoothService] = useState(() => new BluetoothService());
   const [ntripClient] = useState(() => new NtripClient());
   const [nmeaParser] = useState(() => new NmeaParser());
@@ -30,7 +31,7 @@ function App() {
   const processNmeaData = useCallback((data: string) => {
     const newBuffer = nmeaBuffer + data;
     const lines = newBuffer.split('\n');
-    
+
     // Keep the last incomplete line in the buffer
     setNmeaBuffer(lines[lines.length - 1]);
 
@@ -39,16 +40,22 @@ function App() {
       const line = lines[i].trim();
       if (line.startsWith('$')) {
         const parsed = nmeaParser.parse(line);
-        
+
         if (parsed) {
           // Update position
           if (parsed.latitude !== undefined && parsed.longitude !== undefined) {
-            setPosition({
+            const newPosition = {
               latitude: parsed.latitude,
               longitude: parsed.longitude,
               altitude: parsed.altitude,
               timestamp: new Date(),
-            });
+            };
+            setPosition(newPosition);
+
+            // Envoyer la position au client NTRIP si connecté
+            if (ntripClient.isConnected()) {
+              ntripClient.updateGpsPosition(newPosition);
+            }
           }
 
           // Update fix quality
@@ -74,6 +81,13 @@ function App() {
 
   // Handle Bluetooth connection
   const handleBleConnect = async () => {
+    // Defensive check: ensure Web Bluetooth API exists before attempting to connect
+    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
+      console.error('Web Bluetooth API not available in this browser/context');
+      alert('Web Bluetooth non disponible dans ce navigateur ou contexte. Utilisez Chrome sur Android et accédez à l\'application via HTTPS (ou utilisez ngrok)');
+      return;
+    }
+
     try {
       await bluetoothService.connect();
       setBleConnected(true);
@@ -101,6 +115,18 @@ function App() {
   const handleNtripConnect = async (config: NtripConfig) => {
     try {
       setShowNtripDialog(false);
+
+      // Pour le mountpoint NEAR, s'assurer qu'on a une position GPS
+      if (config.mountpoint.toUpperCase() === 'NEAR' && !position) {
+        alert('Position GPS requise pour le mountpoint NEAR. Veuillez attendre que votre position soit détectée.');
+        return;
+      }
+
+      // Définir la position initiale si disponible
+      if (position) {
+        ntripClient.setInitialPosition(position);
+      }
+
       await ntripClient.connect(config);
       setNtripConnected(true);
 
@@ -114,9 +140,64 @@ function App() {
           }
         }
       });
+
+      // Afficher un message informatif pour NEAR
+      if (config.mountpoint.toUpperCase() === 'NEAR') {
+        console.log('Connecté avec mountpoint NEAR - sélection automatique de la station la plus proche');
+      }
     } catch (error) {
       console.error('NTRIP connection failed:', error);
       alert('Failed to connect to NTRIP caster. Please check your configuration.');
+    }
+  };
+
+  // Handle automatic NTRIP connection
+  const handleAutoNtripConnect = async (config: AutoMountpointConfig) => {
+    try {
+      if (!position) {
+        alert('Position GPS non disponible pour la connexion automatique');
+        return;
+      }
+
+      setShowNtripDialog(false);
+
+      // Afficher un indicateur de chargement
+      const loadingMessage = 'Recherche du meilleur mountpoint...';
+      console.log(loadingMessage);
+
+      // Récupérer le meilleur mountpoint automatiquement
+      const bestMountpoint = await MountpointService.getAutoMountpoint(config, position);
+
+      if (!bestMountpoint) {
+        alert(`Aucun mountpoint trouvé dans un rayon de ${config.maxDistance || 50}km`);
+        return;
+      }
+
+      // Créer la configuration NTRIP avec le mountpoint trouvé
+      const ntripConfig: NtripConfig = {
+        host: config.host,
+        port: config.port,
+        mountpoint: bestMountpoint.mountpoint,
+        username: config.username,
+        password: config.password,
+        sendGpsToServer: config.sendGpsToServer,
+        wsUrl: config.wsUrl,
+      };
+
+      // Se connecter avec le mountpoint automatique
+      await handleNtripConnect(ntripConfig);
+
+      // Afficher les détails du mountpoint sélectionné
+      alert(
+        `Connecté automatiquement au mountpoint: ${bestMountpoint.mountpoint}\n` +
+        `Distance: ${bestMountpoint.distance?.toFixed(1)}km\n` +
+        `Réseau: ${bestMountpoint.network}\n` +
+        `Pays: ${bestMountpoint.country}`
+      );
+
+    } catch (error) {
+      console.error('Auto NTRIP connection failed:', error);
+      alert('Échec de la connexion automatique NTRIP. Veuillez essayer manuellement.');
     }
   };
 
@@ -172,7 +253,7 @@ function App() {
         </div>
 
         <div className="tab-content">
-          {activeTab === 'map' && <MapView position={position} />}
+          {activeTab === 'map' && <MapView position={position} fixType={fixType} />}
           {activeTab === 'info' && (
             <InfoTab
               satellites={satellites}
@@ -206,6 +287,8 @@ function App() {
         isOpen={showNtripDialog}
         onClose={() => setShowNtripDialog(false)}
         onConnect={handleNtripConnect}
+        onAutoConnect={handleAutoNtripConnect}
+        position={position}
       />
     </div>
   );
