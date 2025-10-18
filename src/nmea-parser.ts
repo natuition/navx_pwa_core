@@ -1,4 +1,4 @@
-import { NmeaData, SatelliteInfo } from './types';
+import { NmeaData, SatelliteInfo, getConstellation } from './types';
 
 /**
  * Parse NMEA sentences from GPS data
@@ -122,6 +122,7 @@ export class NmeaParser {
           azimuth,
           snr,
           used: snr > 0,
+          constellation: getConstellation(satId),
         });
       }
     });

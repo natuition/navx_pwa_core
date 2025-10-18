@@ -120,6 +120,7 @@ const SatelliteTable: React.FC<{ satellites: SatelliteInfo[] }> = ({ satellites 
         <thead>
           <tr>
             <th>ID</th>
+            <th>Constellation</th>
             <th>Elevation</th>
             <th>Azimuth</th>
             <th>SNR</th>
@@ -130,6 +131,11 @@ const SatelliteTable: React.FC<{ satellites: SatelliteInfo[] }> = ({ satellites 
           {satellites.map((sat) => (
             <tr key={sat.id} className={sat.used ? 'used' : ''}>
               <td>{sat.id}</td>
+              <td>
+                <span className={`constellation constellation-${sat.constellation.toLowerCase()}`}>
+                  {sat.constellation}
+                </span>
+              </td>
               <td>{sat.elevation}°</td>
               <td>{sat.azimuth}°</td>
               <td>

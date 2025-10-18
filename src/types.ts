@@ -27,6 +27,39 @@ export interface SatelliteInfo {
   azimuth: number;
   snr: number;
   used: boolean;
+  constellation: string;
+}
+
+/**
+ * Determine satellite constellation based on satellite ID
+ * Based on standard GNSS satellite ID ranges
+ */
+export function getConstellation(satelliteId: number): string {
+  if (satelliteId >= 1 && satelliteId <= 32) {
+    return 'GPS';
+  } else if (satelliteId >= 33 && satelliteId <= 64) {
+    return 'SBAS';
+  } else if (satelliteId >= 65 && satelliteId <= 96) {
+    return 'GLONASS';
+  } else if (satelliteId >= 120 && satelliteId <= 158) {
+    return 'SBAS';
+  } else if (satelliteId >= 159 && satelliteId <= 163) {
+    return 'BeiDou';
+  } else if (satelliteId >= 164 && satelliteId <= 182) {
+    return 'BeiDou';
+  } else if (satelliteId >= 183 && satelliteId <= 192) {
+    return 'IMES';
+  } else if (satelliteId >= 193 && satelliteId <= 197) {
+    return 'QZSS';
+  } else if (satelliteId >= 198 && satelliteId <= 215) {
+    return 'IMES';
+  } else if (satelliteId >= 216 && satelliteId <= 246) {
+    return 'Galileo';
+  } else if (satelliteId >= 247 && satelliteId <= 255) {
+    return 'Compass';
+  } else {
+    return 'Unknown';
+  }
 }
 
 // NTRIP configuration
