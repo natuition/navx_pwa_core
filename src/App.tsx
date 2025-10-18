@@ -3,6 +3,7 @@ import './App.css';
 import { MapView } from './components/MapView';
 import { InfoTab } from './components/InfoTab';
 import { NtripDialog } from './components/NtripDialog';
+import { InstallButton } from './components/InstallButton';
 import { BluetoothService } from './bluetooth-service';
 import { NtripClient } from './ntrip-client';
 import { NmeaParser } from './nmea-parser';
@@ -288,6 +289,8 @@ function App() {
         onAutoConnect={handleAutoNtripConnect}
         position={position}
       />
+      
+      <InstallButton />
     </div>
   );
 }
